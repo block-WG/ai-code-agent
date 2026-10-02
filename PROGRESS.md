@@ -1,7 +1,7 @@
 # AI 코딩 에이전트 — 진행 과정 및 구현 가이드
 
 > 기획·설계는 `DESIGN.md`, **진행 과정과 실제 구현 방법은 이 문서**에서 관리합니다.
-> 작성일: 2026-10-01 · 마지막 갱신: 2026-10-01
+> 작성일: 2026-10-01 · 마지막 갱신: 2026-10-02
 
 ---
 
@@ -9,8 +9,8 @@
 
 | Phase | 내용 | 상태 |
 |---|---|---|
-| **Phase 0** | 스캐폴딩 (Console 준비, venv, DB, Hello World, git) | 🔄 **진행 중** (1~2단계 완료, 3단계부터 재개) |
-| Phase 1 | 읽기 전용 에이전트 (`read_file`, `git_status`/`git_diff`) | ⏳ 대기 |
+| **Phase 0** | 스캐폴딩 (Console 준비, venv, DB, Hello World, git) | ✅ **완료** (2026-10-02) |
+| Phase 1 | 읽기 전용 에이전트 (`read_file`, `git_status`/`git_diff`) | ⏳ **다음 할 일** |
 | Phase 2 | 쓰기/실행 + 승인 게이트 | ⏳ 대기 |
 | Phase 3 | DB 영속화 + SSE 스트리밍 | ⏳ 대기 |
 | Phase 4 | 확장 (MCP, 서브에이전트) — 선택 | ⏳ 대기 |
@@ -23,8 +23,8 @@
 | 2 | `.env` 작성 | ✅ 완료 | 파일 생성 확인 (내용은 미확인 — 키 보호) |
 | 3 | PostgreSQL DB 생성 | ✅ 완료 | 2026-10-02 `ai_code_agent` 생성·목록 확인, `.env` 비밀번호 일치 확인 |
 | 4 | Claude API Hello World | ✅ 완료 | 2026-10-02 `claude-haiku-4-5`, 입력 9 / 출력 21 토큰 (약 $0.0001) |
-| 5 | git 초기화 + `.gitignore` | ⏳ **다음 할 일** | `.env` 커밋 금지, `.idea/` 제외 |
-| 6 | 이 문서(PROGRESS.md) 갱신 | 🔄 계속 | |
+| 5 | git 초기화 + `.gitignore` + GitHub 연동 | ✅ 완료 | 2026-10-02 첫 커밋 `65fe340`, `github.com/block-WG/ai-code-agent` push |
+| 6 | 이 문서(PROGRESS.md) 갱신 | ✅ 완료 | 이후에도 작업마다 계속 갱신 |
 
 ---
 
@@ -57,21 +57,34 @@
   - 흐름: `load_dotenv()` → `os.environ["AGENT_MODEL"]` → `anthropic.Anthropic()` → `client.messages.create(...)` → `content[0].text` / `usage` 출력
   - 응답: `Hello! 👋 Nice to meet you. How can I help you today?`
   - usage: `input_tokens=9`, `output_tokens=21` → 비용 약 $0.000114 (Haiku 4.5 $1/$5 기준: 9×$0.000001 + 21×$0.000005)
+- **5단계 완료**: git 초기화 및 GitHub 연동
+  - `.gitignore` 작성 후 `git init` (제외: `.venv/`, `.env`, `__pycache__/`, `node_modules/`, `.idea/`)
+  - 이 저장소 전용 git 사용자 설정 (`git config user.name` / `user.email`, 전역 설정과 분리)
+  - 첫 커밋 `65fe340` → 브랜치 `main` → `https://github.com/block-WG/ai-code-agent` 에 push
+  - 이후 작업 단위마다 `git add .` → `git commit -m "..."` → `git push` 로 이력 관리
+- **Phase 0 완료** → 다음은 Phase 1 (읽기 전용 에이전트)
 
 ---
 
-## 3. 현재 환경 스냅샷 (2026-10-01)
+## 3. 현재 환경 스냅샷 (2026-10-02)
 
 ### 디렉토리 구조
 ```
 C:\ai-code-agent\
+├─ .gitignore                     # git 제외 목록
 ├─ DESIGN.md                      # 기획·설계
 ├─ PROGRESS.md                    # 이 문서 (진행 과정·구현 방법)
-├─ CONVERSATION_LOG_20260923.md   # 기획 대화 원문
 └─ backend\
-   ├─ .venv\                      # 가상환경 (폴더)
-   └─ .env                        # 환경변수 (파일, git 제외 대상)
+   ├─ hello.py                    # Claude API Hello World
+   ├─ .venv\                      # 가상환경 (git 제외)
+   └─ .env                        # 환경변수 (git 제외)
 ```
+
+### 개발 도구
+| 항목 | 내용 |
+|---|---|
+| 편집기 | IntelliJ IDEA Ultimate + Python 플러그인 (인터프리터: `backend\.venv`) |
+| 저장소 | `https://github.com/block-WG/ai-code-agent` (브랜치 `main`) |
 
 ### 설치 패키지 (`backend\.venv`)
 | 패키지 | 버전 |
@@ -155,7 +168,7 @@ DATABASE_URL=postgresql+psycopg://postgres:비밀번호@localhost:5432/ai_code_a
 - 비밀번호에 `@ : / #` 같은 특수문자가 있으면 URL 인코딩 (`@` → `%40`)
 - 키는 이 파일에만 둔다 (채팅·코드·커밋에 넣지 않기)
 
-### 3단계. PostgreSQL DB 생성 ⏳ (다음 할 일)
+### 3단계. PostgreSQL DB 생성 ✅
 
 **사전 점검 결과 (2026-10-01)**: 서비스 실행 중, 5432 리스닝, 도구 설치 확인 → 바로 진행 가능
 
@@ -199,7 +212,7 @@ DATABASE_URL=postgresql+psycopg://postgres:비밀번호@localhost:5432/ai_code_a
 #### 마무리 확인
 - `.env`의 `DATABASE_URL` 비밀번호가 방금 입력한 `postgres` 비밀번호와 같은지 확인
 
-### 4단계. Claude API Hello World ⏳
+### 4단계. Claude API Hello World ✅
 `backend\hello.py` 같은 파일 하나를 **직접 작성**한다. 구현할 흐름:
 1. `dotenv`의 `load_dotenv()`로 `.env` 불러오기
 2. `anthropic.Anthropic()`으로 클라이언트 생성 (환경변수 `ANTHROPIC_API_KEY`를 자동으로 읽음)
@@ -220,7 +233,7 @@ DATABASE_URL=postgresql+psycopg://postgres:비밀번호@localhost:5432/ai_code_a
 | `400 ... credit balance is too low` | 충전 미반영, 키의 워크스페이스·결제 조직 불일치 |
 | `404 not_found_error` (model) | 모델 ID 오타 (`claude-haiku-4-5`) |
 
-### 5단계. git 초기화 + `.gitignore` ⏳
+### 5단계. git 초기화 + `.gitignore` + GitHub 연동 ✅
 ```powershell
 cd C:\ai-code-agent
 git init
@@ -235,6 +248,18 @@ node_modules/
 ```
 - 첫 커밋 전에 `git status`로 `.env`가 목록에 **없는지** 확인
 
+**첫 커밋과 GitHub 연결**
+```powershell
+git add .
+git commit -m "Phase 0: 프로젝트 초기 설정 및 Claude API Hello World"
+git branch -M main
+git remote add origin https://github.com/사용자이름/ai-code-agent.git
+git push -u origin main
+```
+- GitHub에서 저장소를 만들 때 README·.gitignore·license는 추가하지 않는다 (추가하면 push 시 충돌)
+- 주소의 `사용자이름` 자리에는 이메일이 아니라 GitHub 사용자 이름을 넣는다
+- 주소를 잘못 등록했으면 `git remote add`가 아니라 `git remote set-url origin 주소`로 고친다
+
 ### 6단계. 이 문서 갱신
 - 각 단계 완료 시 1장 표의 상태와 2장 로그를 갱신
 - Hello World 결과의 `usage`(토큰 수)와 Console Usage 화면의 실제 비용을 기록해서 `DESIGN.md` 12-3 예산표 보정에 활용
@@ -242,11 +267,10 @@ node_modules/
 ---
 
 ## 5. 다음 세션 시작 시 체크리스트
-1. PowerShell에서 `cd C:\ai-code-agent\backend` → `.\.venv\Scripts\Activate.ps1`
-2. **3단계 DB 생성**부터 재개
-3. 4단계 Hello World 작성·실행 → 결과(텍스트, usage) 기록
-4. 5단계 git 초기화 (`.gitignore` 먼저)
-5. Phase 0 완료 후 Phase 1(읽기 전용 에이전트: `read_file` + `tool_runner`) 착수
+1. IntelliJ에서 `C:\ai-code-agent` 열기 (터미널은 `Alt + F12`)
+2. `README.md` 작성 (프로젝트 소개, 기술 스택, 실행 방법, 진행 상황)
+3. **Phase 1 착수**: 읽기 전용 에이전트 (`read_file` 툴 + `tool_runner`)
+4. 작업 단위마다 `git add .` → `git commit` → `git push`
 
 ---
 
