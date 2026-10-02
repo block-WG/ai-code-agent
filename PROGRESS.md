@@ -10,10 +10,20 @@
 | Phase | 내용 | 상태 |
 |---|---|---|
 | **Phase 0** | 스캐폴딩 (Console 준비, venv, DB, Hello World, git) | ✅ **완료** (2026-10-02) |
-| Phase 1 | 읽기 전용 에이전트 (`read_file`, `git_status`/`git_diff`) | ⏳ **다음 할 일** |
+| Phase 1 | 읽기 전용 에이전트 (`read_file`, `git_status`/`git_diff`) | 🔄 **진행 중** (1번 완료, 2번부터 재개) |
 | Phase 2 | 쓰기/실행 + 승인 게이트 | ⏳ 대기 |
 | Phase 3 | DB 영속화 + SSE 스트리밍 | ⏳ 대기 |
 | Phase 4 | 확장 (MCP, 서브에이전트) — 선택 | ⏳ 대기 |
+
+### Phase 1 세부 작업
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1 | 도구 호출 개념 이해 | ✅ 완료 | 2026-10-02 (아래 로그 참고) |
+| 2 | 도구 요청 눈으로 확인 | ⏳ **다음 할 일** | 도구 정의를 넣어 1회 호출하고 `tool_use` 블록 출력 (`backend\tool_demo.py`) |
+| 3 | 에이전트 루프 직접 작성 | ⏳ 대기 | `stop_reason`으로 분기하는 반복문 + `read_file` 도구 |
+| 4 | `tool_runner`로 교체 | ⏳ 대기 | `@beta_tool` + `client.beta.messages.tool_runner` |
+| 5 | 안전장치 | ⏳ 대기 | 프로젝트 폴더 밖 경로 차단, 반복 횟수 상한 |
+| 6 | `git_status` / `git_diff` 도구 추가 | ⏳ 대기 | |
 
 ### Phase 0 세부 단계
 | # | 단계 | 상태 | 비고 |
@@ -63,6 +73,14 @@
   - 첫 커밋 `65fe340` → 브랜치 `main` → `https://github.com/block-WG/ai-code-agent` 에 push
   - 이후 작업 단위마다 `git add .` → `git commit -m "..."` → `git push` 로 이력 관리
 - **Phase 0 완료** → 다음은 Phase 1 (읽기 전용 에이전트)
+- 문서 추가: `TROUBLESHOOTING.md`(에러 기록), `README.md`(프로젝트 소개)
+- **Phase 1 착수 — 1번 작업(도구 호출 개념) 완료**
+  - Claude는 도구를 직접 실행하지 못하고 "실행해 달라"는 요청만 한다. 실제 실행은 내 코드가 한다
+  - 흐름: 질문 + 도구 정의 전송 → Claude가 `tool_use` 요청 → 내 코드가 실행 → `tool_result`로 회신 → Claude가 최종 답변
+  - 응답의 `stop_reason`으로 구분: `tool_use`면 도구 실행 후 다시 호출, `end_turn`이면 종료
+  - `tool_use`의 `id`와 `tool_result`의 `tool_use_id`가 같아야 한다 (요청과 결과를 짝짓는 번호)
+  - 매 호출마다 대화 전체를 다시 보내므로 반복이 길어지면 비용이 늘어난다 → 반복 횟수 상한 필요
+  - 학습 순서 결정: 도구 요청 확인 → 루프 직접 작성 → `tool_runner`로 교체 (내부 동작을 이해한 뒤 SDK 기능 사용)
 
 ---
 
@@ -267,10 +285,43 @@ git push -u origin main
 ---
 
 ## 5. 다음 세션 시작 시 체크리스트
-1. IntelliJ에서 `C:\ai-code-agent` 열기 (터미널은 `Alt + F12`)
-2. `README.md` 작성 (프로젝트 소개, 기술 스택, 실행 방법, 진행 상황)
-3. **Phase 1 착수**: 읽기 전용 에이전트 (`read_file` 툴 + `tool_runner`)
+1. 작업 시작 전 `git pull` (다른 PC에서 올린 내용 받기)
+2. IntelliJ에서 프로젝트 폴더 열기 (터미널은 `Alt + F12`)
+3. **Phase 1의 2번 작업부터 재개**: 도구 정의를 넣어 1회 호출하고 `tool_use` 블록 확인
 4. 작업 단위마다 `git add .` → `git commit` → `git push`
+5. 에러를 겪으면 `TROUBLESHOOTING.md`에 기록
+
+### 다른 PC에서 이어서 작업할 때 (처음 한 번)
+
+코드와 문서는 GitHub에서 받고, git에 올리지 않은 것(가상환경, `.env`, 편집기 설정)은 그 PC에서 다시 만든다.
+
+1. **사전 설치 확인**: Python 3.13 이상, Git, IntelliJ IDEA + Python 플러그인
+2. **저장소 받기**
+   ```powershell
+   cd C:\
+   git clone https://github.com/block-WG/ai-code-agent.git
+   cd ai-code-agent
+   ```
+3. **이 저장소 전용 git 사용자 설정** (PC마다 따로 해야 함)
+   ```powershell
+   git config user.name "GitHub사용자이름"
+   git config user.email "GitHub계정이메일"
+   ```
+4. **가상환경과 패키지**
+   ```powershell
+   cd backend
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install fastapi uvicorn anthropic sqlalchemy alembic "psycopg[binary]" python-dotenv
+   ```
+5. **`backend\.env` 새로 작성** (4장 2단계 참고)
+   - API 키는 GitHub에 없으므로 직접 옮기거나 Console에서 새로 발급한다
+   - 키를 메신저·메일·메모 앱으로 보내지 않는다
+6. **IntelliJ 인터프리터 지정**: Project Structure → SDKs → `backend\.venv\Scripts\python.exe`
+7. **확인**: `python hello.py` 실행 → 응답과 `usage`가 출력되면 준비 완료
+8. PostgreSQL은 Phase 3부터 필요하므로 그때 설치한다
+
+이후에는 어느 PC에서든 **시작할 때 `git pull`, 끝낼 때 `git push`** 만 지키면 된다.
 
 ---
 
